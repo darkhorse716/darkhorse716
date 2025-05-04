@@ -1,0 +1,127 @@
+
+def get_float(prompt):
+    while True:
+        try:
+            return float(input(prompt))
+        except ValueError:
+            print("Please enter a valid number.")
+
+def get_int(prompt, options=None):
+    while True:
+        try:
+            choice = int(input(prompt))
+            if options is None or choice in options:
+                return choice
+            else:
+                print(f"Please choose from {options}.")
+        except ValueError:
+            print("Enter a number.")
+
+def calculate_tax(income, brackets):
+    tax = 0
+    for lower, upper, rate in brackets:
+        if income > lower:
+            taxable = min(income, upper) - lower
+            tax += taxable * rate
+        else:
+            break
+    return tax
+
+def calculate_ctc(children, income, filing_status):
+    # Basic CTC: $2000 per qualifying child under age 17
+    # Phases out at $200k (single) or $400k (married filing jointly)
+    threshold = 200000 if filing_status != 2 else 400000
+    reduction = max(0, (income - threshold) // 1000 * 50)
+    credit = max(0, (children * 2000) - reduction)
+    return credit
+
+def calculate_eitc(income, children, filing_status):
+    # 2023 EITC maximums (simplified)
+    # This is a very rough approximation for demo purposes
+    max_credits = [600, 3995, 6604, 7430]
+    income_limits = {
+        1: [17640, 46560, 52918, 56838],  # Single
+        2: [25610, 53520, 59378, 63298]   # Married filing jointly
+    }
+    if children > 3:
+        children = 3
+    limit = income_limits[filing_status][children]
+    if income > limit:
+        return 0
+    else:
+        return max_credits[children]
+
+# Input
+wages = get_float("Please enter your regular hourly wage: ")
+regular_hours = get_float("Enter number of regular hours worked in a 2-week period: ")
+overtime_hours = get_float("Enter number of overtime hours worked in a 2-week period: ")
+overtime_rate = get_float("Enter your overtime pay rate (e.g., 1.5 for time-and-a-half): ")
+hours = regular_hours + (overtime_hours * overtime_rate)
+amountearned = wages * hours
+yearly = amountearned * 26
+
+print(f"\n${amountearned:.2f} is what you have earned before taxes for 2 weeks.")
+print(f"${yearly:.2f} is your estimated yearly wage.")
+
+print('\nTo estimate your 2023 federal taxes, please choose a filing status:')
+print('1. Single')
+print('2. Married filing jointly')
+print('3. Married filing separately')
+print('4. Head of Household')
+federal = get_int("Choose 1-4: ", [1, 2, 3, 4])
+
+# Get number of children for credits
+children = get_int("Enter the number of qualifying children under 17: ")
+
+# 2023 standard deductions
+standard_deductions = {
+    1: 13850,
+    2: 27700,
+    3: 13850,
+    4: 20800
+}
+
+# Tax brackets
+brackets_by_status = {
+    1: [(0, 11000, 0.10), (11000, 44725, 0.12), (44725, 95375, 0.22), (95375, 182100, 0.24),
+        (182100, 231250, 0.32), (231250, 578125, 0.35), (578125, float('inf'), 0.37)],
+    2: [(0, 22000, 0.10), (22000, 89450, 0.12), (89450, 190750, 0.22), (190750, 364200, 0.24),
+        (364200, 462500, 0.32), (462500, 693750, 0.35), (693750, float('inf'), 0.37)],
+    3: [(0, 11000, 0.10), (11000, 44725, 0.12), (44725, 95375, 0.22), (95375, 182100, 0.24),
+        (182100, 231250, 0.32), (231250, 346875, 0.35), (346875, float('inf'), 0.37)],
+    4: [(0, 15700, 0.10), (15700, 59850, 0.12), (59850, 95350, 0.22), (95350, 182100, 0.24),
+        (182100, 231250, 0.32), (231250, 578100, 0.35), (578100, float('inf'), 0.37)]
+}
+
+deduction = standard_deductions[federal]
+taxable_income = max(0, yearly - deduction)
+brackets = brackets_by_status[federal]
+estimated_federal_tax = calculate_tax(taxable_income, brackets)
+
+# Apply credits
+ctc = calculate_ctc(children, yearly, federal)
+eitc = calculate_eitc(yearly, children, 2 if federal == 2 else 1)
+total_credits = ctc + eitc
+net_federal_tax = max(0, estimated_federal_tax - total_credits)
+
+# Output
+print(f"\nStandard Deduction: ${deduction:.2f}")
+print(f"Taxable Income: ${taxable_income:.2f}")
+print(f"Estimated Federal Tax Before Credits: ${estimated_federal_tax:.2f}")
+print(f"Child Tax Credit (CTC): ${ctc:.2f}")
+print(f"Earned Income Tax Credit (EITC): ${eitc:.2f}")
+print(f"Estimated Federal Tax After Credits: ${net_federal_tax:.2f}")
+
+# Optional state tax
+state_tax = 0
+state_input = input("\nWould you like to estimate state taxes? (yes/no): ").strip().lower()
+if state_input == 'yes':
+    state_rate = get_float("Enter your estimated state tax rate as a percentage (e.g., 5 for 5%): ")
+    state_tax = taxable_income * (state_rate / 100)
+    print(f"Estimated State Tax: ${state_tax:.2f}")
+
+# Summary
+total_tax = net_federal_tax + state_tax
+after_tax_income = yearly - total_tax
+print(f"\nTotal Estimated Tax (Federal + State): ${total_tax:.2f}")
+print(f"Estimated Yearly Take-Home Pay After Taxes: ${after_tax_income:.2f}")
